@@ -50,13 +50,12 @@ function BBData(data) {
          * Get member of object by dot-notated string
          * @param  {string} key    The key to get from the object. Support dot-notation
          * @param  {boolean} allowUndefined If set to true return undefined if member do not exist. Can be used to check if sometning actually exist.
-         * @example Lab.Util.Object.get("a.b", { a: { b: 2 } }) // will return 2.
          * @return {mixed}         The value from the query or null
          */
         get: function(key, allowUndefined) {
             if (!key) return self.data;
-            var callback = function(obj, i) {
-                return obj && (typeof(obj[i]) !== "undefined") ? obj[i] : (allowUndefined ? undefined : null);
+            var callback = function(value, index) {
+                return value && (typeof(value[index]) !== "undefined") ? value[index] : (allowUndefined ? undefined : null);
             };
             return key.split('.').reduce(callback, self.data);
         },
@@ -67,7 +66,6 @@ function BBData(data) {
          * @param {mixed}  value The value to set
          */
         set: function(path, value) {
-            console.log('set path: ' + path);
             // Check if new value is identical to current value.
             // Only works for simple data-types. Objects, functions etc will not be catched here.
             if (self.get(path) === value) {
@@ -135,12 +133,6 @@ function BBData(data) {
          * @return {void}
          */
         bind: function(domElement, path, attribute, options) {
-            // console.log('bind domElement: %o', domElement);
-            // console.log('typeof(domElement): ' + typeof(domElement));
-            // console.log('domElement instanceof HTMLElement: ' + (domElement instanceof HTMLElement));
-            
-            // conditional, conditions ...
-
             if (!(domElement instanceof HTMLElement)) {
                 for (var i = 0; i < domElement.length; i++) {
                     if (domElement[i] instanceof HTMLElement) {
@@ -171,8 +163,6 @@ function BBData(data) {
             self.bindings[path][attribute].push(binding);
             domElement.addEventListener(binding.options.event, binding.handler, false);
             self.updateBoundElementsForPathAndAttribute(path, attribute, self.get(path));
-            console.log('self.bindings: %o', self.bindings);
-
         },
 
         /**
@@ -229,7 +219,7 @@ function BBData(data) {
          */
         updateBoundElementsForPath: function(path, value) {
             if (!self.bindings[path]) {
-                console.log('No bindings for path: ' + path);
+                // console.log('No bindings for path: ' + path);
                 return;
             }
             for (var attribute in self.bindings[path]) {
@@ -274,11 +264,11 @@ function BBData(data) {
          */
         updateBoundElementsForPathAndAttribute: function(path, attribute, value) {
             if (!self.bindings[path]) {
-                console.log('No bindings for path: ' + path);
+                // console.log('No bindings for path: ' + path);
                 return;
             }
             if (!self.bindings[path][attribute]) {
-                console.log('No bindings for attribute ' + attribute + ' for path: ' + path);
+                // console.log('No bindings for attribute ' + attribute + ' for path: ' + path);
                 return;
             }
 
@@ -399,9 +389,6 @@ function BBData(data) {
 
         isProperty: function(attribute, element) {
             return typeof(element[attribute]) !== "undefined";
-            // return element.hasAttribute(attribute);
-            // var properties = ["innerHTML", "value", "checked"];
-            // return properties.indexOf(attribute) > -1;
         },
 
         /**
@@ -414,7 +401,6 @@ function BBData(data) {
             if (!path) path = null; // Main data
             if (!self.observables[path]) self.observables[path] = [];
             self.observables[path].push(callback);
-            console.log('self.observables: %o', self.observables);
         },
 
         /**
@@ -427,7 +413,6 @@ function BBData(data) {
         unobserve: function(path) {
             if (!self.observables[path]) return;
             self.observables[path].splice(0,self.observables[path].length)
-            // self.observables[path] = [];
         },
 
         /**
@@ -437,9 +422,6 @@ function BBData(data) {
          * @return {void}
          */
         notifyObserversForPath: function(path, value) {
-            // console.log('notifyObserversForPath: ' + path);
-            // console.log('self.observables: %o', self.observables);
-            // console.log('value: ', value);
             if (!self.observables[path]) {
                 return;
             }
