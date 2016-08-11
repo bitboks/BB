@@ -32,6 +32,11 @@
  *
  * Both bindings and observables require that the setter of BBData is used when modifying data:
  * instance.set(path, value)
+ *
+ * Contact:
+ * info@bitboks.no
+ * http://www.bitboks.no/sourcecode/bbdata
+ * 
  */
 
 
