@@ -39,11 +39,6 @@
  * 
  */
 
-
-/**
- * Todo: Conditional bindings ...
- */
-
 function BBData(data) {
 
     var self = {
