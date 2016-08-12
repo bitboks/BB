@@ -120,6 +120,7 @@ Methods related to observables:
 - @param { function } callback - Method to call when data is modified.
     The call has on argument: A notification-object with the following properties:
     - path: (string) The path to the observed data
+    - changedPath: (string) Path to the modified data triggering the call
     - value: (mixed) The new value
 - @return { void }
 
