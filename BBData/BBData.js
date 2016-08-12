@@ -82,7 +82,7 @@ function BBData(data) {
             self.updateBoundElementsForPath(path, value);
             self.updateBoundElementsAtPath(path, value);
             if (self.observables[path]) {
-                self.notifyObserversForPath(path, value);
+                self.notifyObserversForPath(path, value, path);
             }
             self.notifyObserversFromPath(path);
         },
@@ -421,13 +421,14 @@ function BBData(data) {
          * @param  {mixed}  value New value
          * @return {void}
          */
-        notifyObserversForPath: function(path, value) {
+        notifyObserversForPath: function(path, value, changedPath) {
             if (!self.observables[path]) {
                 return;
             }
             for (var i = 0; i < self.observables[path].length; i++) {
                 self.observables[path][i]({
                     path: path,
+                    changedPath: changedPath,
                     value: value
                 });
             }
@@ -445,12 +446,12 @@ function BBData(data) {
             while (parts.length > 0) {
                 var currentPath = parts.join(".");
                 if (self.observables[currentPath]) {
-                    self.notifyObserversForPath(currentPath, self.get(currentPath));
+                    self.notifyObserversForPath(currentPath, self.get(currentPath), path);
                 }
                 parts.pop();
             }
             // Also trigger observables for path "", main data-object.
-            self.notifyObserversForPath(null, self.get(""));
+            self.notifyObserversForPath(null, self.get(""), path);
         },
 
     };
