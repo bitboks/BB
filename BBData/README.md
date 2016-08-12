@@ -1,11 +1,9 @@
 BBData
 =======
 
-BBData helps you connect data to views and is suitable for web-apps where the user-interface changes over time. You can use it as a simple template-engine that keeps the view in synch using bindings. If for example your web-app collects any data from the user you can use bindings between data and the UI. Bindings let you skip a lot of code used to glue data to the view. It creates a connection between them: A change in one will be reflected in the other.
+[BBData](http://www.bitboks.no/sourcecode/bbdata) helps you connect data to views and is suitable for web-apps where the user-interface changes over time. You can use it as a simple template-engine that keeps the view in synch using bindings. If for example your web-app collects any data from the user you can use bindings between data and the UI. Bindings let you skip a lot of code used to glue data to the view. It creates a connection between them: A change in one will be reflected in the other.
 
 If you need to know when data is modified you can observe the data and get a notification whenever it is updated. This is handy for persistent data - You do not need to add any event-listeners for the user-interface, you simply register an observer for your data and will be notified on the fly.
-
-<!-- Check out examples at http://www.bitboks.no/sourcecode/bbdata -->
 
 ### Create an instance
 You can create one or several instances of BBData based on your needs.
@@ -137,4 +135,5 @@ Methods related to observables:
 To get all observables run <em>getObservables()</em> on the instance of BBData.
 
 Both bindings and observables require that the setter of BBData is used when modifying data: <em>instance.set(path, value)</em>.
- 
+
+More info at http://www.bitboks.no/sourcecode/bbdata
