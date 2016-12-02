@@ -65,7 +65,7 @@ function BBData(data) {
          * @param {string} path  Path for value. Support dot-notation (a.b)
          * @param {mixed}  value The value to set
          */
-        set: function(path, value) {
+        set: function(path, value, element) {
             // Check if new value is identical to current value.
             // Only works for simple data-types. Objects, functions etc will not be catched here.
             if (self.get(path) === value) {
@@ -82,9 +82,9 @@ function BBData(data) {
             self.updateBoundElementsForPath(path, value);
             self.updateBoundElementsAtPath(path, value);
             if (self.observables[path]) {
-                self.notifyObserversForPath(path, value, path);
+                self.notifyObserversForPath(path, value, path, element);
             }
-            self.notifyObserversFromPath(path);
+            self.notifyObserversFromPath(path, element);
         },
 
         /**
@@ -133,6 +133,10 @@ function BBData(data) {
          * @return {void}
          */
         bind: function(domElement, path, attribute, options) {
+            if (!domElement) {
+                console.warn('BBData: Cannot bind path "' + path + '", no dom-element supplied.')
+                return;
+            }
             if (!(domElement instanceof HTMLElement)) {
                 for (var i = 0; i < domElement.length; i++) {
                     if (domElement[i] instanceof HTMLElement) {
@@ -191,6 +195,28 @@ function BBData(data) {
         },
 
         /**
+         * Remove bindings
+         * @param  {string} optionalPath Only remove matching paths. If not set all is removed
+         * @return {void}
+         */
+        unbindAll: function(optionalPath) {
+            // Example: optionalPath = "user" will remove path "user.a", "user_something", "user" ...
+            optionalPath = optionalPath || "";
+            for (var path in self.bindings) {
+                if (path.indexOf(optionalPath) == 0) {
+                    for (var attribute in self.bindings[path]) {
+                        self.bindings[path][attribute].forEach(function(binding) {
+                            binding.element.removeEventListener(binding.options.event, binding.handler, false);
+                            self.bindings[path][attribute].shift();
+                        });
+                        delete self.bindings[path][attribute];
+                    }
+                    delete self.bindings[path];
+                }
+            }
+        },
+
+        /**
          * Handler for changes to bound dom-elements. 
          * Update bound data based on value of the dom-element
          * @param  {event} e
@@ -204,9 +230,9 @@ function BBData(data) {
                 if (e.target === binding.element) {
                     var value = binding.element.value;
                     if (binding.options.valueTransformer) {
-                        value = binding.options.valueTransformer.reverseTransformedValue(value);
+                        value = binding.options.valueTransformer.reverseTransformedValue(value, binding.element);
                     }
-                    self.set(path, value);
+                    self.set(path, value, binding.element);
                 }
             }
         },
@@ -279,7 +305,7 @@ function BBData(data) {
                 var modifiedValue = value;
 
                 if (options.valueTransformer) {
-                    modifiedValue = options.valueTransformer.transformedValue(modifiedValue);
+                    modifiedValue = options.valueTransformer.transformedValue(modifiedValue, element);
                 } else if (options.boolean) {
                     modifiedValue = value ? true : false;
                 } else if (options.negateBoolean) {
@@ -290,27 +316,25 @@ function BBData(data) {
                     modifiedValue = value == options.negateBooleanCondition ? false : true;
                 }
 
-                if (element.tagName == "SELECT") {
-                    if (attribute == "option") {
-                        if (self.isArray(modifiedValue)) {
-                            element.innerHTML = "";
-                            for (var ii = 0; ii < modifiedValue.length; ii++) {
-                                var optionEl = document.createElement("option");
-                                var optionValue = modifiedValue[ii];
-                                // Object with properties or string used as both value and text (innerHTML)
-                                if (self.isObject(optionValue)) {
-                                    for (var property in optionValue) {
-                                        optionEl[property] = optionValue[property];
-                                    }
-                                } else {
-                                    optionEl.value = optionValue;
-                                    optionEl.innerHTML = optionValue;
+                if (element.tagName == "SELECT" && attribute == "option") {
+                    if (self.isArray(modifiedValue)) {
+                        element.innerHTML = "";
+                        for (var ii = 0; ii < modifiedValue.length; ii++) {
+                            var optionEl = document.createElement("option");
+                            var optionValue = modifiedValue[ii];
+                            // Object with properties or string used as both value and text (innerHTML)
+                            if (self.isObject(optionValue)) {
+                                for (var property in optionValue) {
+                                    optionEl[property] = optionValue[property];
                                 }
-                                element.appendChild(optionEl);
+                            } else {
+                                optionEl.value = optionValue;
+                                optionEl.innerHTML = optionValue;
                             }
-                        } else {
-                            console.warn('Bound value path "' + path + '" is not an array. Cannot create option-elements for select-element.');
+                            element.appendChild(optionEl);
                         }
+                    } else {
+                        console.warn('Bound value path "' + path + '" is not an array. Cannot create option-elements for select-element.');
                     }
                     for (var ii = 0; ii < element.options.length; ii++) {
                         if (element.options[ii].value == modifiedValue) {
@@ -343,8 +367,9 @@ function BBData(data) {
                  */
                 if (self.isProperty(attribute, element)) {
                     element[attribute] = modifiedValue;
+                } else {
+                    element.setAttribute(attribute, modifiedValue);
                 }
-                element.setAttribute(attribute, modifiedValue);
             }
         },
 
@@ -421,7 +446,7 @@ function BBData(data) {
          * @param  {mixed}  value New value
          * @return {void}
          */
-        notifyObserversForPath: function(path, value, changedPath) {
+        notifyObserversForPath: function(path, value, changedPath, element) {
             if (!self.observables[path]) {
                 return;
             }
@@ -429,7 +454,8 @@ function BBData(data) {
                 self.observables[path][i]({
                     path: path,
                     changedPath: changedPath,
-                    value: value
+                    value: value,
+                    element: element
                 });
             }
         },
@@ -440,18 +466,18 @@ function BBData(data) {
          * @param  {string} path Path of changed data
          * @return {void}
          */
-        notifyObserversFromPath: function(path) {
+        notifyObserversFromPath: function(path, element) {
             var parts = path.split(".");
             parts.pop(); // Remove last element (the one that is changed.)
             while (parts.length > 0) {
                 var currentPath = parts.join(".");
                 if (self.observables[currentPath]) {
-                    self.notifyObserversForPath(currentPath, self.get(currentPath), path);
+                    self.notifyObserversForPath(currentPath, self.get(currentPath), path, element);
                 }
                 parts.pop();
             }
             // Also trigger observables for path "", main data-object.
-            self.notifyObserversForPath(null, self.get(""), path);
+            self.notifyObserversForPath(null, self.get(""), path, element);
         },
 
     };
@@ -466,8 +492,8 @@ function BBData(data) {
             return self.get(path, allowUndefined);
         },
 
-        set: function(path, value) {
-            self.set(path, value);
+        set: function(path, value, element) {
+            self.set(path, value, element);
         },
 
         getData: function() {
@@ -480,6 +506,10 @@ function BBData(data) {
 
         unbind: function(domElement, path, attribute) {
             self.unbind(domElement, path, attribute);
+        },
+
+        unbindAll: function(optionalPath) {
+            self.unbindAll(optionalPath);
         },
 
         getBindings: function() {
