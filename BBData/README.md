@@ -78,6 +78,11 @@ Methods related to bindings:
 - @param { string } attribute
 - @return { void }
 
+#### unbindAll(optionalPath)
+- Remove all bindings. If optionalPath is spesified, remove all bindings for path.
+- @param { string } optionalPath (optional) Restrict removal to this path
+- @return { void }
+
 ####getBindings()
 - Get all registered bindings for the instance
 - @return { object } A list of all bindings organized by path and attribute
