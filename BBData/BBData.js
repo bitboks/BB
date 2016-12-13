@@ -228,7 +228,9 @@ function BBData(data) {
             for (var i = 0; i < self.bindings[path][attribute].length; i++) {
                 var binding = self.bindings[path][attribute][i];
                 if (e.target === binding.element) {
-                    var value = binding.element.value;
+                    // var value = binding.element.value;
+                    // var value = binding.element.getAttribute(attribute);
+                    var value = binding.element[attribute];
                     if (binding.options.valueTransformer) {
                         value = binding.options.valueTransformer.reverseTransformedValue(value, binding.element);
                     }
