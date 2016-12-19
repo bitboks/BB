@@ -64,6 +64,8 @@ function BBData(data) {
          * Set a value to an object
          * @param {string} path  Path for value. Support dot-notation (a.b)
          * @param {mixed}  value The value to set
+         * @param {dom-element}  element (optional) Element to pass on to the observers
+         * @return {string}      The modified path (May differ from supplied path for arrays)
          */
         set: function(path, value, element) {
             // Check if new value is identical to current value.
@@ -93,20 +95,21 @@ function BBData(data) {
                 }
                 return (self.isObject(prev[cur])) ? prev[cur] : (prev[cur] = {});
             }, self.data);
+            return modifiedPath;
         },
 
         /**
          * Change path (move)
          * @param  {string} fromPath Path of content to move
          * @param  {string} toPath   New path
-         * @return {void}
+         * @return {string}          The modified path (May differ from supplied path for arrays)
          */
         move: function(fromPath, toPath) {
             if (fromPath == toPath) return;
             if (self.isInArray(toPath)) {
-                self.moveInArray(fromPath, toPath);
+                return self.moveInArray(fromPath, toPath);
             } else {
-                self.moveInObject(fromPath, toPath);
+                return self.moveInObject(fromPath, toPath);
             }
         },
 
@@ -114,23 +117,24 @@ function BBData(data) {
          * Move data to new path in object
          * @param  {string} fromPath Path to move from
          * @param  {string} toPath   Path to move to
-         * @return {void}
+         * @return {string}          The modified path (May differ from supplied path for arrays)
          */
         moveInObject: function(fromPath, toPath) {
             var value = self.get(fromPath);
             self.delete(fromPath);
-            self.set(toPath, value);            
+            return self.set(toPath, value);            
         },
 
         /**
          * Move data to new path in array
          * @param  {string} fromPath Path to move from
          * @param  {string} toPath   Path to move to
-         * @return {void}
+         * @return {string}          The modified path
          */
         moveInArray: function(fromPath, toPath) {
             var value = self.get(fromPath);
             self.delete(fromPath);
+            var modifiedPath;
             toPath.split(".").reduce(function (prev, cur, idx, arr) {
                 var isLast = (idx === arr.length - 1);
                 if (isLast) {
@@ -141,12 +145,13 @@ function BBData(data) {
                     }
                     prev.splice(index, 0, value);
                     var parentPath = self.getParentPath(toPath);
-                    var modifiedPath = (parentPath ? parentPath + '.' : '') + index;
+                    modifiedPath = (parentPath ? parentPath + '.' : '') + index;
                     self.notify(modifiedPath, value, 'create', null);
                     return;
                 }
                 return (self.isObject(prev[cur])) ? prev[cur] : (prev[cur] = {});
-            }, self.data);       
+            }, self.data); 
+            return modifiedPath;      
         },
 
         /**
@@ -226,7 +231,7 @@ function BBData(data) {
          * Create a binding between data and a dom-element
          * @param  {element or HTMLCollection} domElement. If collection: Iterate elements and bind all of them.
          *                             Eks: getElementsByTagName returns a collection, getElementById returns one element.
-         * @param  {string} path       Path to data
+         * @param  {string} path       Path to data. The value at this path is bound to the dom-element.
          * @param  {string} attribute  What attribut of the dom-element to bind.
          *                             - "value", "innerHTML", "disabled", "class" etc. Anything available using getAttribute().
          * @param  {object} options    Settings
@@ -665,11 +670,11 @@ function BBData(data) {
         },
 
         set: function(path, value, element) {
-            self.set(path, value, element);
+            return self.set(path, value, element);
         },
 
         move: function(fromPath, toPath) {
-            self.move(fromPath, toPath);
+            return self.move(fromPath, toPath);
         },
 
         delete: function(path) {

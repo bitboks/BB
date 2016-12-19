@@ -32,12 +32,22 @@ Methods related to data:
 - Set data for path
 - @param { string } path - The path to data
 - @param { mixed } value - The data to set
+- @return { string } The modified path. If data is set on an array this path may differ from path
+
+####move(fromPath, toPath)
+- Move existing data
+- @param { string } fromPath - The path to data
+- @param { mixed } toPath - The new path
 - @return { void }
 
 ####getData()
 - Get all data for the instance
 - @return { object } Current data
 
+### remove()
+- Clean up. Remove references to data and dom-elements. Should be used if the instance of BBData is no longer used.
+- For applications that frequently creates new instances to replace old ones this method should be used to limit memory leaks
+- @return { void }
 
 ### Bindings
 
@@ -112,7 +122,7 @@ The method <em>unbind</em> will remove the link between the element and data:
 To get all registered bindings run <em>getBindings()</em> on the instance of BBData.
 
 ### Observables: 
-Any number of methods may be registered for any key. If your web-app has any persistent data you can use observations to get notified whenever data is changed and initiate some method to store the data remotely.
+Any number of methods may be registered for any path. If your web-app has any persistent data you can use observations to get notified whenever data is changed and initiate some method to store the data remotely.
 - Any time observed data is modified the observer will be notified.
 - The observer reseives a notification-object containing the path, action ("create", "update" or "delete") and new value of the data.
 - The path "null" is used to observe the main data-object (data passed as the argument to BBData).
@@ -125,7 +135,7 @@ Methods related to observables:
 - @param { function } callback - Method to call when data is modified.
     The call has on argument: A notification-object with the following properties:
     - action: (string) "create", "update" or "delete"
-    - path: (string) The path to the observed data
+    - path: (string or null) The observerd path. Will be null for the top-level path
     - changedPath: (string) Path to the modified data triggering the call
     - value: (mixed) The new value,
     - element: (dom-element) (optional) Element bound to data at path
@@ -134,6 +144,11 @@ Methods related to observables:
 ####unobserve(path)
 - Remove observer(s) for data at path. All observers for specified path will be removed.
 - @param { string } path - The path to the observed data
+- @return { void }
+
+#### unobserveAll(optionalPath)
+- Remove all observers. If optionalPath is spesified, remove all observers for path.
+- @param { string } optionalPath (optional) Restrict removal to this path
 - @return { void }
 
 ####getObservables()
