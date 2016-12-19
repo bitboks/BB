@@ -71,20 +71,106 @@ function BBData(data) {
             if (self.get(path) === value) {
                 return;
             }
+            var modifiedPath = path;
             path.split(".").reduce(function (prev, cur, idx, arr) {
                 var isLast = (idx === arr.length - 1);
                 if (isLast) {
+                    if (Array.isArray(prev)) {
+                        var index = parseInt(cur, 10);
+                        if (index > prev.length) {
+                            cur = prev.length;
+                        } else if (index < 0) {
+                            cur = 0;
+                        }
+                        // Path may have changed (for arrays). Send notification for actual modified path:
+                        var parentPath = self.getParentPath(path);
+                        modifiedPath = (parentPath ? parentPath + '.' : '') + cur;
+                    }
+                    var isNew = typeof(prev[cur]) == 'undefined';
                     prev[cur] = value;
+                    self.notify(modifiedPath, value, (isNew ? 'create' : 'update'), element);
                     return;
                 }
                 return (self.isObject(prev[cur])) ? prev[cur] : (prev[cur] = {});
             }, self.data);
-            self.updateBoundElementsForPath(path, value);
-            self.updateBoundElementsAtPath(path, value);
-            if (self.observables[path]) {
-                self.notifyObserversForPath(path, value, path, element);
+        },
+
+        /**
+         * Change path (move)
+         * @param  {string} fromPath Path of content to move
+         * @param  {string} toPath   New path
+         * @return {void}
+         */
+        move: function(fromPath, toPath) {
+            if (fromPath == toPath) return;
+            if (self.isInArray(toPath)) {
+                self.moveInArray(fromPath, toPath);
+            } else {
+                self.moveInObject(fromPath, toPath);
             }
-            self.notifyObserversFromPath(path, element);
+        },
+
+        /**
+         * Move data to new path in object
+         * @param  {string} fromPath Path to move from
+         * @param  {string} toPath   Path to move to
+         * @return {void}
+         */
+        moveInObject: function(fromPath, toPath) {
+            var value = self.get(fromPath);
+            self.delete(fromPath);
+            self.set(toPath, value);            
+        },
+
+        /**
+         * Move data to new path in array
+         * @param  {string} fromPath Path to move from
+         * @param  {string} toPath   Path to move to
+         * @return {void}
+         */
+        moveInArray: function(fromPath, toPath) {
+            var value = self.get(fromPath);
+            self.delete(fromPath);
+            toPath.split(".").reduce(function (prev, cur, idx, arr) {
+                var isLast = (idx === arr.length - 1);
+                if (isLast) {
+                    var index = parseInt(cur, 10);
+                    if (isNaN(index)) index = 0;
+                    if (index > prev.length) {
+                        index = prev.length;
+                    }
+                    prev.splice(index, 0, value);
+                    var parentPath = self.getParentPath(toPath);
+                    var modifiedPath = (parentPath ? parentPath + '.' : '') + index;
+                    self.notify(modifiedPath, value, 'create', null);
+                    return;
+                }
+                return (self.isObject(prev[cur])) ? prev[cur] : (prev[cur] = {});
+            }, self.data);       
+        },
+
+        /**
+         * Remove data at path
+         * Bindings and observables are also removed for path
+         * @param  {string} path The path to delete
+         * @return {void}
+         */
+        delete: function(path) {
+            path.split(".").reduce(function (prev, cur, idx, arr) {
+                var isLast = (idx === arr.length - 1);
+                if (isLast) {
+                    self.unbindAll(path);
+                    self.unobserve(path);
+                    if (Array.isArray(prev)) {
+                        prev.splice(cur, 1);
+                    } else {
+                        delete prev[cur];
+                    }
+                    self.notify(path, null, 'delete', null);
+                    return;
+                }
+                return (self.isObject(prev[cur])) ? prev[cur] : (prev[cur] = {});
+            }, self.data);
         },
 
         /**
@@ -105,6 +191,35 @@ function BBData(data) {
             } else{
                 return Array.isArray(potentionalArray);
             }
+        },
+
+        /**
+         * Get value for parent path
+         * @param  {string} path Current path
+         * @return {mixed}       The "parent" value
+         */
+        getParentValue: function(path) {
+            var parts = path.split(".");
+            parts.pop();
+            var parentPath = parts.join(".");
+            if (!parentPath) parentPath = null; // Top-level element
+            return self.get(parentPath);
+        },
+
+        getParentPath: function(path) {
+            path = path.split('.');
+            path.pop();
+            return path.join('.');
+        },
+
+        /**
+         * Check if value of "parent"-path is an array
+         * @param  {string}  path The path
+         * @return {Boolean}
+         */
+        isInArray: function(path) {
+            var value = self.getParentValue(path);
+            return self.isArray(value);
         },
 
         /**
@@ -217,6 +332,24 @@ function BBData(data) {
         },
 
         /**
+         * Data has changed, notify observers of path and parent path(s)
+         * and update bound user-interface
+         * @param  {string}      path       The modified path
+         * @param  {mixed}       value      Value at path
+         * @param  {string}      action     Type of modification: create, delete, update
+         * @param  {dom-element} element    (optional) Dom-element bound to data at path
+         * @return {void}
+         */
+        notify: function(path, value, action, element) {
+            self.updateBoundElementsForPath(path, value);
+            self.updateBoundElementsAtPath(path, value);
+            if (self.observables[path]) {
+                self.notifyObserversForPath(path, value, path, action, element);
+            }
+            self.notifyObserversFromPath(path, action, element);
+        },
+
+        /**
          * Handler for changes to bound dom-elements. 
          * Update bound data based on value of the dom-element
          * @param  {event} e
@@ -228,8 +361,6 @@ function BBData(data) {
             for (var i = 0; i < self.bindings[path][attribute].length; i++) {
                 var binding = self.bindings[path][attribute][i];
                 if (e.target === binding.element) {
-                    // var value = binding.element.value;
-                    // var value = binding.element.getAttribute(attribute);
                     var value = binding.element[attribute];
                     if (binding.options.valueTransformer) {
                         value = binding.options.valueTransformer.reverseTransformedValue(value, binding.element);
@@ -247,7 +378,6 @@ function BBData(data) {
          */
         updateBoundElementsForPath: function(path, value) {
             if (!self.bindings[path]) {
-                // console.log('No bindings for path: ' + path);
                 return;
             }
             for (var attribute in self.bindings[path]) {
@@ -271,6 +401,7 @@ function BBData(data) {
 
         },
 
+        /** See updateBoundElementsAtPath */
         updateBoundElementsAtPathRecursivly: function(path, value) {
             if (self.bindings[path]) {
                 for (var attribute in self.bindings[path]) {
@@ -292,11 +423,9 @@ function BBData(data) {
          */
         updateBoundElementsForPathAndAttribute: function(path, attribute, value) {
             if (!self.bindings[path]) {
-                // console.log('No bindings for path: ' + path);
                 return;
             }
             if (!self.bindings[path][attribute]) {
-                // console.log('No bindings for attribute ' + attribute + ' for path: ' + path);
                 return;
             }
 
@@ -375,6 +504,13 @@ function BBData(data) {
             }
         },
 
+        /**
+         * Is this attribute a boolean dom-attribute?
+         * Boolean attrrbutes can be printed without values: <p disabled></p> instead of <p disabled="disabled"></p>
+         * The off/false-value must be set by omiting the attribute altogether (disabled=false will not do)
+         * @param  {string}  attribute Attribute-name
+         * @return {Boolean}
+         */
         isBooleanAttribute: function(attribute) {
             var booleans = [
                 "allowfullscreen", 
@@ -382,6 +518,7 @@ function BBData(data) {
                 "autofocus",
                 "checked",
                 "compact",
+                "contenteditable",
                 "declare",
                 "default",
                 "defer",
@@ -391,7 +528,6 @@ function BBData(data) {
                 "inert",
                 "ismap",
                 "itemscope",
-                "multiple",
                 "multiple",
                 "muted",
                 "nohref",
@@ -406,14 +542,19 @@ function BBData(data) {
                 "seamless",
                 "selected",
                 "sortable",
+                "spellcheck",
                 "truespeed",
-                "typemustmatch",
-                "contenteditable",
-                "spellcheck"
+                "typemustmatch"
             ];
             return booleans.indexOf(attribute) > -1;
         },
 
+        /**
+         * Is this attribute a property on the dom-element?
+         * @param  {string}  attribute Attribute-name
+         * @param  {dom-element}  element   The element to check for the attribute
+         * @return {Boolean}
+         */
         isProperty: function(attribute, element) {
             return typeof(element[attribute]) !== "undefined";
         },
@@ -443,18 +584,47 @@ function BBData(data) {
         },
 
         /**
+         * Remove all observers
+         * @param  {string} optionalPath Optional path to limit removal on
+         * @return {void}
+         */
+        unobserveAll: function(optionalPath) {
+            // Example: optionalPath = "user" will remove path "user.a", "user_something", "user" ...
+            optionalPath = optionalPath || "";
+            for (var path in self.observables) {
+                if (path.indexOf(optionalPath) == 0) {
+                    self.unobserve(path);
+                    delete self.observables[path];
+                }
+            }
+        },
+
+        /**
+         * Clean up. Remove references to data and dom-elements
+         * For applications that frequently creates new instances to replace old ones 
+         * this method should be used to limit memory leaks
+         * @return {void}
+         */
+        remove: function() {
+            self.unobserveAll();
+            self.unbindAll();
+            self.data = null;
+        },
+
+        /**
          * Data is modified. Pass a notification-object to the observer.
          * @param  {string} path  Path of changed data
          * @param  {mixed}  value New value
          * @return {void}
          */
-        notifyObserversForPath: function(path, value, changedPath, element) {
+        notifyObserversForPath: function(path, value, changedPath, action, element) {
             if (!self.observables[path]) {
                 return;
             }
             for (var i = 0; i < self.observables[path].length; i++) {
                 self.observables[path][i]({
                     path: path,
+                    action: action,
                     changedPath: changedPath,
                     value: value,
                     element: element
@@ -468,18 +638,18 @@ function BBData(data) {
          * @param  {string} path Path of changed data
          * @return {void}
          */
-        notifyObserversFromPath: function(path, element) {
+        notifyObserversFromPath: function(path, action, element) {
             var parts = path.split(".");
             parts.pop(); // Remove last element (the one that is changed.)
             while (parts.length > 0) {
                 var currentPath = parts.join(".");
                 if (self.observables[currentPath]) {
-                    self.notifyObserversForPath(currentPath, self.get(currentPath), path, element);
+                    self.notifyObserversForPath(currentPath, self.get(currentPath), path, action, element);
                 }
                 parts.pop();
             }
             // Also trigger observables for path "", main data-object.
-            self.notifyObserversForPath(null, self.get(""), path, element);
+            self.notifyObserversForPath(null, self.get(""), path, action, element);
         },
 
     };
@@ -496,6 +666,14 @@ function BBData(data) {
 
         set: function(path, value, element) {
             self.set(path, value, element);
+        },
+
+        move: function(fromPath, toPath) {
+            self.move(fromPath, toPath);
+        },
+
+        delete: function(path) {
+            self.delete(path);
         },
 
         getData: function() {
@@ -528,6 +706,10 @@ function BBData(data) {
 
         getObservables: function() {
             return self.observables;
+        },
+
+        remove: function() {
+            self.remove();
         }
     }
 };
