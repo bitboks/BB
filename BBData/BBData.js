@@ -568,12 +568,16 @@ function BBData(data) {
          * Register an observer for a path
          * @param  {string}   path     Path to data
          * @param  {Function} callback The method to send a notification to
+         * @param  {any} context (optional) Instance registering the observation
          * @return {void}
          */
-        observe: function(path, callback) {
+        observe: function(path, callback, context) {
             if (!path) path = null; // Main data
             if (!self.observables[path]) self.observables[path] = [];
-            self.observables[path].push(callback);
+            self.observables[path].push({
+                callback: callback,
+                context: context ? context : null
+            });
         },
 
         /**
@@ -627,12 +631,13 @@ function BBData(data) {
                 return;
             }
             for (var i = 0; i < self.observables[path].length; i++) {
-                self.observables[path][i]({
+                self.observables[path][i].callback({
                     path: path,
                     action: action,
                     changedPath: changedPath,
                     value: value,
-                    element: element
+                    element: element,
+                    context: self.observables[path][i].context
                 });
             }
         },
@@ -701,8 +706,8 @@ function BBData(data) {
             return self.bindings;
         },
 
-        observe: function(path, callback) {
-            self.observe(path, callback);
+        observe: function(path, callback, context) {
+            self.observe(path, callback, context);
         },
 
         unobserve: function(path) {
