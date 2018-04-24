@@ -327,7 +327,6 @@ function BBData(data) {
                     for (var attribute in self.bindings[path]) {
                         self.bindings[path][attribute].forEach(function(binding) {
                             binding.element.removeEventListener(binding.options.event, binding.handler, false);
-                            self.bindings[path][attribute].shift();
                         });
                         delete self.bindings[path][attribute];
                     }
